@@ -1,0 +1,967 @@
+<title>Yanice's Typewriter</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600&family=Special+Elite&display=swap">
+<style>
+  /* ═══════════════════════════════════════════════════════════════
+     SYSTEM
+     Hierarchy : paper text → keys → carriage → glass body → table/wall
+     Metaphor  : a clear-shell typewriter on a studio model table
+     Materials : clear thick glass · red / cobalt / yellow acrylic ·
+                 black rubber · chrome · brushed aluminium · ivory plastic
+     Depth     : wall → table → back wall → internals(z10) → carriage(z−70)
+                 → paper → glass top → keys
+     Light     : one key light, upper-left-front, ~45° elevation.
+                 Shadows fall lower-right, long and soft. Warm ambient fill.
+     One committed visual world: the ivory studio. Single theme by design.
+     ═══════════════════════════════════════════════════════════════ */
+  :root{
+    --wall:#f3f0e9; --table:#efebe2; --table-deep:#e6e1d6;            /* Glass Objects DS §5: ivory / ivory-2 */
+    --ink:#23262b; --ink-soft:#6a6e75; --ink-you:#A9302A; --dark:#1b1d21; --sh:60,48,32;   /* §5 ink, dark, shadow rgb */
+    --paper:#FBF7EF; --paper-2:#F3EDE1; --paper-rule:#C9C1B3;
+    --red:#C8352B; --cobalt:#1F4FA3; --yellow:#E8B62B; --black:#17181A;
+    --glass-top-a:rgba(236,241,245,.36); --glass-top-b:rgba(214,223,231,.34);
+    --glass-front-a:rgba(232,238,243,.26); --glass-front-b:rgba(205,216,226,.24);
+    --glass-back:rgba(205,215,225,.32); --glass-edge:rgba(255,255,255,.92); --glass-rim:rgba(110,125,140,.16);
+    --chrome-a:#ffffff; --chrome-b:#d6dbe0; --chrome-c:#858d94; --chrome-d:#33383d;
+    /* §3.4 chrome: hard-edged five-stop bar, conic ring */
+    --chrome-ring:conic-gradient(from calc(210deg + var(--jit, 0deg)), #fff, #9da2aa 30%, #f4f4f4 50%, #8b9099 75%, #fff);
+    --chrome-bar:linear-gradient(180deg, #fff 0%, #c8cbd1 30%, #7a7f87 55%, #dfe1e5 72%, #8e939b 100%);
+    --plastic-a:#FCF9F3; --plastic-b:#E8E2D7; --plastic-side-a:#D2CABC; --plastic-side-b:#8F8779;
+    --grey-cap-a:#E4DED3; --grey-cap-b:#CFC8BB;
+    --rubber-a:#4b4d51; --rubber-b:#2a2c30; --rubber-c:#15161a; --rubber-d:#202226; --rubber-e:#0a0b0d;
+    --shadow-amb:rgba(60,48,32,.55); --shadow-contact:rgba(30,24,16,.55); --shadow-part:rgba(50,40,28,.30);
+    --ui-edge:rgba(27,28,30,.18);
+    /* motion: accelerate when leaving (press), decelerate when arriving (release), spring for mechanical parts */
+    --t-press:80ms; --t-release:280ms; --t-slide:60ms; --t-return:300ms; --t-camera:350ms;
+    --ease-in:cubic-bezier(.5,0,.8,.4); --ease-out:cubic-bezier(.2,.7,.2,1); --ease-spring:cubic-bezier(.34,1.4,.64,1);   /* §8 rebound */
+    --kraft-a:#EDE1C7; --kraft-b:#E3D3B2; --kraft-c:#D8C7A3; --kraft-ink:#2A231B; --kraft-soft:#6E5F49; --kraft-rule:#B9A88A;
+    /* procedural textures: a constant colour with noisy alpha, blended with multiply/overlay */
+    --grain:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .62  0 0 0 0 .57  0 0 0 0 .47  0 0 0 .34 0'/></filter><rect width='200' height='200' filter='url(%23g)'/></svg>");
+    --fiber:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'><filter id='f'><feTurbulence type='fractalNoise' baseFrequency='.014 .5' numOctaves='4' seed='7' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .74  0 0 0 0 .66  0 0 0 0 .52  0 0 0 .32 0'/></filter><rect width='300' height='300' filter='url(%23f)'/></svg>");
+    --brush:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='120'><filter id='b'><feTurbulence type='fractalNoise' baseFrequency='.004 .9' numOctaves='3' seed='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .5  0 0 0 0 .5  0 0 0 0 .52  0 0 0 .8 0'/></filter><rect width='400' height='120' filter='url(%23b)'/></svg>");
+  }
+
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0; background:var(--wall); color:var(--ink);
+    font-family:"Jost", "Futura", "Avenir Next", system-ui, sans-serif; overflow:hidden; -webkit-font-smoothing:antialiased}
+  button{font-family:inherit}
+
+  /* Studio wall: light falls from the upper left; fine paper grain */
+  .room{position:fixed; inset:0; z-index:0; pointer-events:none;
+    background:radial-gradient(80% 70% at 22% 10%, rgba(255,255,255,.55), rgba(255,255,255,0) 70%), var(--wall)}
+  .room::after{content:""; position:absolute; inset:0; opacity:.08; mix-blend-mode:multiply;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .9 0'/></filter><rect width='160' height='160' filter='url(%23n)'/></svg>")}
+
+  /* §6: one line of caption top-left, 11px, uppercase. Controls are plain text too. */
+  .topbar{position:fixed; inset:0 0 auto 0; z-index:5; height:44px; padding:0 18px; display:flex; align-items:center; justify-content:space-between; gap:12px;
+    font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-soft)}
+  .topbar .caption{display:inline-flex; align-items:center; gap:14px; white-space:nowrap}
+  .topbar .caption b{font-weight:500; color:var(--ink)}
+  .topbar a, .topbar button{display:inline-flex; align-items:center; gap:8px; height:30px; padding:0 4px; border:0; background:none; color:var(--ink);
+    font:inherit; letter-spacing:inherit; text-transform:inherit; text-decoration:none; cursor:pointer; border-radius:4px}
+  .topbar a:hover{text-decoration:underline; text-underline-offset:3px}
+  .topbar button:focus-visible, .topbar a:focus-visible{outline:none; box-shadow:0 0 0 2px #fff, 0 0 0 3.5px #2b58d6}
+  .dot{width:6px; height:6px; border-radius:50%; background:#3ecf5e; box-shadow:0 0 6px 1px #3ecf5e}              /* §3.6 LED: the only saturated colour */
+  .topbar button[aria-pressed="false"] .dot{background:#7c8188; box-shadow:none}
+  .dot.busy{background:#ffa521; box-shadow:0 0 6px 1px #ffa521; animation:led .5s steps(2) infinite}
+  @keyframes led{50%{opacity:.45}}
+
+  /* §9 depth of field: the nearest edge of the frame softens progressively */
+  .dof{position:fixed; left:0; right:0; bottom:0; z-index:4; pointer-events:none}
+  .dof i{position:absolute; left:0; right:0; bottom:0; display:block}
+  .dof i:nth-child(1){height:11vh; backdrop-filter:blur(1px); -webkit-backdrop-filter:blur(1px); mask:linear-gradient(to top, #000 40%, transparent); -webkit-mask:linear-gradient(to top, #000 40%, transparent)}
+  .dof i:nth-child(2){height:6vh; backdrop-filter:blur(2px); -webkit-backdrop-filter:blur(2px); mask:linear-gradient(to top, #000 30%, transparent); -webkit-mask:linear-gradient(to top, #000 30%, transparent)}
+  .dof i:nth-child(3){height:3vh; backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px); mask:linear-gradient(to top, #000 20%, transparent); -webkit-mask:linear-gradient(to top, #000 20%, transparent)}
+
+  /* ───────── Stage ───────── */
+  .stage{position:fixed; inset:0; z-index:1; --sc:1; --cx:0px}
+
+  /* Paper: kraft stock. Fibre + grain textures scroll with the text (background-attachment: local), the top edge is deckled in JS,
+     ink bleeds a hair. Tucked behind the platen (position measured in JS). Hover lifts it and tilts it toward the pointer. */
+  /* Paper is the subject. It fills the frame above the platen; the zone sits above the machine layer and is cut at the
+     platen's centre line so the sheet reads as wrapping over the roller. Kraft stock: fibre + grain scroll with the text. */
+  .paper-zone{position:absolute; left:0; right:0; top:60px; bottom:300px; pointer-events:none;
+    display:flex; justify-content:center; align-items:flex-end; overflow:hidden; z-index:3}
+  .paper-zone::after{ /* curvature over the roller */
+    content:""; position:absolute; left:0; right:0; bottom:0; height:calc(30px * var(--sc)); pointer-events:none;
+    background:linear-gradient(180deg, rgba(30,28,26,0), rgba(30,28,26,.10) 55%, rgba(30,28,26,.30))}
+  .paper{
+    pointer-events:auto; position:relative; display:flex; flex-direction:column; width:min(calc(600px * var(--sc)), 88vw); min-height:min(56%, 100%); max-height:100%; color:var(--kraft-ink);
+    font-family:"Special Elite", "Courier Prime", "Courier New", monospace;
+    font-size:clamp(13px, calc(10px + .5vw), 17px); line-height:1.7;
+    filter:drop-shadow(22px 30px 20px rgba(70,58,44,.34)) drop-shadow(3px 5px 5px rgba(70,58,44,.18));
+    transform:translateX(var(--cx)) translateY(var(--lift, 0px));
+    transition:transform .06s linear, filter .35s ease;
+  }
+  .paper:hover{--lift:-2px; filter:drop-shadow(26px 36px 24px rgba(70,58,44,.38)) drop-shadow(4px 6px 6px rgba(70,58,44,.2))}
+  .paper.return{transition:transform var(--t-return) var(--ease-spring), filter .35s ease}
+  .paper.rising{animation:rise 1.5s cubic-bezier(.2,.75,.2,1) both}
+  @keyframes rise{ from{transform:translateY(58%)} to{transform:translateY(0)} }
+  .sheet{flex:1 1 auto; min-height:0; overflow-y:auto; scrollbar-width:none; padding:3em 3.2em 5.5em;
+    background:
+      var(--fiber), var(--grain),
+      linear-gradient(100deg, var(--kraft-a) 0%, var(--kraft-b) 45%, var(--kraft-c) 100%);
+    background-blend-mode:multiply, multiply, normal;
+    background-attachment:local, local, scroll;
+    background-size:300px 300px, 200px 200px, auto;
+    clip-path:var(--deckle, none)}
+  .sheet::-webkit-scrollbar{display:none}
+  .sheet .line, .sheet .paper-head{text-shadow:0 0 .7px rgba(42,35,27,.5)}   /* ink bleeding into the fibre */
+  .paper-head{display:flex; justify-content:space-between; gap:12px; font-size:.8em; color:var(--kraft-soft); white-space:nowrap;
+    padding-bottom:10px; margin-bottom:1.8em; letter-spacing:.02em;
+    background:var(--rule) left bottom / 600px 6px repeat-x}   /* a hand-ruled line, not a CSS border */
+
+  .line{margin:0; white-space:pre-wrap; word-wrap:break-word}
+  .line + .line{margin-top:.15em}
+  .line.h{margin-top:1.35em; padding-bottom:7px; background:var(--rule-dotted) left bottom / 600px 6px repeat-x; letter-spacing:.02em}
+  .line.h:first-child{margin-top:0}
+  .line.li{padding-left:1.4em; text-indent:-1.4em}
+  .line.li::before{content:"— "}
+  .line.p{margin-top:.55em}
+  .line.you{color:var(--ink-you); text-align:right; margin-top:1.1em}
+  .line.you::before{content:"you  "; font-size:.75em; color:var(--kraft-soft); letter-spacing:.1em}
+  .line.you.current::before{content:none}
+  .line.you.current{min-height:1.65em}
+  .line.you.current.hide{display:none}
+  .caret{display:inline-block; width:.6em; height:.12em; background:currentColor; opacity:.6; vertical-align:-.12em; margin-left:2px}
+  .hint{font-size:.78em; color:var(--kraft-soft); margin-top:2em}
+
+  .choices{display:flex; flex-wrap:wrap; gap:8px 10px; margin:.9em 0 .2em}
+  .choice{font:inherit; font-size:.9em; line-height:1; color:var(--kraft-ink); background:transparent;
+    border:1px solid var(--kraft-soft); border-radius:999px; padding:9px 14px 7px; cursor:pointer; transition:background .15s, color .15s, transform .12s, box-shadow .12s}
+  .choice b{font-weight:400; color:var(--kraft-soft); margin-right:6px}
+  .choice:hover{background:var(--kraft-ink); color:var(--kraft-a); transform:translateY(-1px); box-shadow:2px 3px 6px -2px rgba(42,35,27,.35)} .choice:hover b{color:var(--kraft-rule)}
+  .choice:active{transform:translateY(1px)}
+  .choice:focus-visible{outline:2px solid var(--cobalt); outline-offset:2px}
+
+  .photo{margin:1em 0 .6em; padding:7px 7px 9px; background:#fff; border:1px solid var(--paper-rule); box-shadow:4px 5px 12px -4px rgba(0,0,0,.18); transform:rotate(-.8deg)}
+  .photo img{display:block; width:100%; height:auto}
+  .photo .ph{aspect-ratio:16/9; display:grid; place-items:center; text-align:center; padding:12px; color:var(--ink-soft); font-size:.8em; line-height:1.5;
+    background:linear-gradient(135deg, #ece7dd, #dcd5c8)}
+  .photo figcaption{font-size:.77em; color:var(--kraft-soft); margin-top:6px}
+
+  /* ───────── The machine: a real CSS 3D scene, seen from above ─────────
+     Design space: 880 wide. Table at y=0. Body: 880 × 110 high × 340 deep (z −170…170).
+     Camera: perspective 1800px, rig tilted −58° (a product shot from above), fixed. Placed close: the machine is cropped by the frame.
+     Everything that sits on the machine lives in top-plate coordinates: x → right, y → toward the viewer, translateZ → up.
+     Light: upper-left-back. Shadows fall toward the viewer and to the right (+x, +y). */
+  .scene{position:absolute; left:50%; bottom:0; width:880px; height:780px; margin-left:-440px; z-index:2;
+    transform:scale(var(--sc)); transform-origin:50% 100%; perspective:1100px; perspective-origin:50% 34%; pointer-events:none}   /* §1 */
+  .scene *{pointer-events:auto}
+  .rig{position:absolute; left:0; right:0; bottom:250px; height:0; transform-style:preserve-3d; transform-origin:50% 0;
+    --tilt:52deg; --yaw:0deg; transform:rotateX(calc(var(--tilt) * -1)) rotateY(var(--yaw)); transition:transform var(--t-camera) var(--ease-out)}  /* §1 camera; pointer moves it a little */
+
+  /* Table plane: ambient shadow, contact shadow, the shadows of the parts inside the glass, and coloured light through the acrylic */
+  .floor{position:absolute; left:-1100px; top:0; width:3080px; height:1300px; pointer-events:none; transform-origin:50% 0;
+    transform:translateZ(-300px) rotateX(90deg);
+    background:linear-gradient(180deg, rgba(229,223,212,0) 0%, rgba(229,223,212,.6) 14%, var(--table) 30%, var(--table) 60%, var(--table-deep) 100%)}
+  .floor i{position:absolute; border-radius:50%; display:block}
+  .floor .grain{left:0; right:0; top:200px; bottom:0; border-radius:0; background:var(--grain) 0 0 / 220px 220px; mix-blend-mode:multiply; opacity:.55}
+  .floor .ambient{left:calc(50% - 560px); top:130px; width:1180px; height:440px; transform:translate(90px, 70px);
+    background:radial-gradient(closest-side, var(--shadow-amb), transparent); filter:blur(26px)}
+  .floor .contact{left:calc(50% - 448px); top:150px; width:896px; height:330px; transform:translate(12px, 12px);
+    background:radial-gradient(closest-side, var(--shadow-contact), transparent 92%); filter:blur(7px)}
+  .floor .part{background:radial-gradient(closest-side, var(--shadow-part), transparent); filter:blur(7px); transform:translate(10px, 8px)}
+  .floor .part.sl{left:1268px; top:234px; width:104px; height:104px}
+  .floor .part.sr{left:1748px; top:234px; width:104px; height:104px}
+  .floor .part.seg{left:1418px; top:216px; width:290px; height:150px; border-radius:145px 145px 0 0; opacity:.6}
+  .floor .caustic{filter:blur(16px); mix-blend-mode:multiply}
+  .floor .caustic.r1{left:1120px; top:246px; width:180px; height:86px; background:radial-gradient(closest-side, rgba(200,53,43,.42), transparent)}
+  .floor .caustic.r2{left:1900px; top:246px; width:180px; height:86px; background:radial-gradient(closest-side, rgba(200,53,43,.42), transparent)}
+  .floor .caustic.y1{left:1250px; top:280px; width:200px; height:100px; background:radial-gradient(closest-side, rgba(232,182,43,.42), transparent)}
+  .floor .caustic.b1{left:1720px; top:400px; width:130px; height:60px; background:radial-gradient(closest-side, rgba(31,79,163,.32), transparent)}
+
+  .face{position:absolute; left:0; width:880px}
+  /* Top plate: horizontal at y = −110. Clear glass: barely tinted, defined by its edges and the thickness lip. */
+  .top{top:-280px; height:340px; transform:rotateX(90deg); transform-style:preserve-3d; border-radius:8px;
+    background:linear-gradient(135deg, rgba(255,255,255,.80), rgba(246,244,238,.70) 60%, rgba(240,237,230,.76));
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.85), inset 0 0 18px rgba(255,255,255,.5)}
+  .top::before{ /* the slab's thickness at its near edge */
+    content:""; position:absolute; left:0; right:0; bottom:0; height:10px; border-radius:0 0 8px 8px;
+    background:linear-gradient(180deg, rgba(222,218,208,.4), rgba(255,255,255,.55) 45%, rgba(255,255,255,.95))}
+  /* §3.2 thick clear glass: the inspection window over the ribbon spools and the typebar segment */
+  .window{position:absolute; left:34px; right:34px; top:12px; height:140px; border-radius:8px; transform:translateZ(.6px);
+    background:linear-gradient(135deg, rgba(255,255,255,.55), rgba(255,255,255,.18) 40%, rgba(236,239,243,.12) 70%, rgba(255,255,255,.42));
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.9), inset 0 0 0 4px rgba(255,255,255,.28), 0 0 0 1px rgba(var(--sh),.12), inset 3px 3px 6px rgba(var(--sh),.08)}
+  .window::after{ /* softbox highlight, top-left, −18° */
+    content:""; position:absolute; left:26px; top:14px; width:56px; height:34px; border-radius:50%;
+    background:linear-gradient(120deg, rgba(255,255,255,.9), transparent 70%); transform:rotate(-18deg)}
+    .front{top:-110px; height:110px; transform:translateZ(170px);   /* §3.1 frosted acrylic: front .90 */
+    background:linear-gradient(180deg, rgba(253,252,248,.90), rgba(238,235,227,.92) 70%, rgba(222,218,208,.94));
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.85), inset 0 -3px 4px rgba(0,0,0,.10), inset 0 -22px 26px -20px rgba(var(--sh),.18)}
+  .back{top:-110px; height:110px; transform:translateZ(-170px); background:rgba(232,229,221,.92); box-shadow:inset 0 1px 0 rgba(255,255,255,.85)}   /* back .85 */
+  .side{position:absolute; top:-110px; width:340px; height:110px; transform-origin:0 50%; box-shadow:inset 0 1px 0 rgba(255,255,255,.85)}
+  .side.l{left:0; background:rgba(252,251,247,.92); transform:translateZ(170px) rotateY(90deg)}     /* left .95 */
+  .side.r{left:880px; background:rgba(214,210,200,.94); transform:translateZ(170px) rotateY(90deg)} /* right .82 */
+
+  /* Inside the glass, 40px above the table: two spools, the ribbon, the typebar arch and one live chrome typebar */
+  .inner{top:-210px; height:340px; transform:rotateX(90deg); pointer-events:none}
+  .inner.ghost{transform:rotateX(90deg) translate(3px, 2px) translateZ(2px); opacity:.32} /* §3.2 refraction ghost (no filter inside the rig) */
+.spool{position:absolute; top:34px; width:104px; height:104px; border-radius:50%; transform:rotate(var(--spin, 0deg)); transition:transform .14s cubic-bezier(.2,.9,.3,1.2)}
+  .spool::before{ /* the wound ribbon: hundreds of fine turns */
+    content:""; position:absolute; inset:6px; border-radius:50%;
+    background:repeating-radial-gradient(circle at 50% 50%, rgba(0,0,0,.30) 0 .7px, rgba(255,255,255,.07) .7px 1.4px, rgba(0,0,0,0) 1.4px 3.1px)}
+  .spool::after{ /* chrome hub */
+    content:""; position:absolute; inset:36px; border-radius:50%;
+    background:radial-gradient(circle at 38% 32%, #fff 0, var(--chrome-b) 30%, var(--chrome-c) 62%, var(--chrome-d) 100%);
+    box-shadow:0 0 0 2px var(--rubber-c), 1px 2px 3px rgba(0,0,0,.4)}
+  .spool.l{left:148px; background:radial-gradient(circle at 38% 34%, #4a4d55, var(--rubber-c) 62%); box-shadow:inset 0 0 0 1px rgba(255,255,255,.14), 2px 3px 5px rgba(0,0,0,.28)}
+  .sticker{position:absolute; display:block}   /* §3.1 stickers ≤ 20px: where the colour lives */
+  .sticker.c{left:118px; top:150px; width:16px; height:16px; border-radius:50%; background:#d9392b}
+  .sticker.s{left:140px; top:152px; width:13px; height:13px; background:#2b58d6}
+  .sticker.t{left:160px; top:149px; width:0; height:0; border-left:9px solid transparent; border-right:9px solid transparent; border-bottom:16px solid #f2c230}
+  .sticker.label{left:700px; top:144px; width:20px; height:8px; background:#3aa66b; border-radius:1px}
+  .spool.r{right:148px; transform:rotate(calc(var(--spin, 0deg) * -1)); background:radial-gradient(circle at 38% 34%, #4a4d55, var(--rubber-c) 62%); box-shadow:inset 0 0 0 1px rgba(255,255,255,.14), 2px 3px 5px rgba(0,0,0,.28)}
+  .spool i{position:absolute; left:50%; top:50%; width:14px; height:2px; margin:-1px 0 0 -7px; background:var(--chrome-d); box-shadow:0 1px 0 rgba(255,255,255,.45); z-index:1}
+    .ribbon{position:absolute; left:200px; right:200px; top:84px; height:4px; background:var(--rubber-c); opacity:.9}
+  .ribbon::after{content:""; position:absolute; left:42%; right:42%; top:0; bottom:0; background:var(--red)}
+  .segment{position:absolute; left:310px; top:28px; width:260px; height:130px; border-radius:130px 130px 0 0; overflow:hidden;
+    background:repeating-conic-gradient(from -84deg at 50% 100%, rgba(80,88,96,.7) 0 .7deg, transparent .7deg 7.2deg);
+    box-shadow:inset 0 0 0 3px rgba(80,88,96,.45)}
+  .segment::after{content:""; position:absolute; left:50%; bottom:-20px; width:70px; height:40px; margin-left:-35px; border-radius:50%;
+    background:linear-gradient(180deg, var(--chrome-b), var(--chrome-d))}
+  .typebar{position:absolute; left:50%; top:42px; width:3px; height:116px; margin-left:-1.5px; border-radius:2px;
+    background:linear-gradient(90deg, var(--chrome-c), var(--chrome-a) 45%, var(--chrome-c)); transform-origin:50% 100%;
+    transform:rotate(var(--tb, -76deg)); transition:transform 70ms var(--ease-in)}
+  .typebar::before{content:""; position:absolute; left:-3px; top:-2px; width:9px; height:11px; border-radius:2px; background:var(--chrome-d)}
+
+  /* Fittings on the top plate */
+  .groove{position:absolute; left:60px; right:60px; top:92px; height:16px; border-radius:2px; transform:translateZ(.8px);   /* §7 slot: the rail's channel */
+    background:var(--dark); box-shadow:inset 0 1px 2px rgba(0,0,0,.9)}
+.deckplate{position:absolute; left:30px; right:30px; top:150px; bottom:10px; border-radius:18px; transform:translateZ(2px);
+    background:
+      var(--brush),
+      linear-gradient(100deg, rgba(255,255,255,0) 30%, rgba(255,255,255,.30) 45%, rgba(255,255,255,0) 58%),
+      linear-gradient(100deg, #dfe2e5 0%, #c9ced2 40%, #d8dbde 62%, #bcc1c5 100%);
+    background-blend-mode:overlay, normal, normal; background-size:400px 120px, auto, auto;
+    box-shadow:0 1px 0 rgba(255,255,255,.7) inset, 0 -1px 0 rgba(60,64,70,.25) inset, 3px 5px 10px -3px rgba(45,36,26,.4), 0 0 0 1px rgba(60,64,70,.22)}
+  .deckplate::after{content:""; position:absolute; inset:10px; border-radius:12px; box-shadow:inset 0 0 0 1px rgba(255,255,255,.35), inset 0 0 0 2px rgba(60,64,70,.06)}
+  /* Countersunk Phillips screws: recess ring, domed chrome head, cross slot with a lit edge, cast shadow */
+  .screw{position:absolute; width:14px; height:14px; border-radius:50%; transform:translateZ(3px);   /* §3.4: chrome ring + one slot */
+    background:radial-gradient(circle at 42% 36%, #fff 0, #dfe1e5 30%, #a7abb2 70%, #6f747c 100%);
+    box-shadow:0 0 0 1.5px rgba(var(--sh),.35), inset -1px -1px 2px rgba(0,0,0,.35), 2px 3px 4px rgba(var(--sh),.35)}
+  .screw::before{content:""; position:absolute; left:50%; top:50%; width:9px; height:1.6px; margin:-.8px 0 0 -4.5px;
+    background:#5c6168; box-shadow:0 .7px 0 rgba(255,255,255,.55); transform:rotate(var(--sr, 20deg))}
+  .screw.a{left:41px; top:161px} .screw.b{right:41px; top:161px; --sr:-35deg} .screw.c{left:41px; bottom:21px; --sr:70deg} .screw.d{right:41px; bottom:21px; --sr:5deg}
+    .brand{position:absolute; left:70px; top:312px; display:inline-flex; align-items:center; gap:18px; transform:translateZ(3px);
+    color:var(--ink); font-weight:500; letter-spacing:.42em; font-size:13px; text-transform:uppercase}
+  .brand .model{position:absolute; left:auto; right:0}
+  .model{position:absolute; right:70px; top:314px; transform:translateZ(3px); font-weight:400; letter-spacing:.24em; font-size:11px; color:var(--ink-soft); text-transform:uppercase}
+  .mark{display:inline-flex; gap:8px; align-items:center}
+  .mark i{display:block; width:12px; height:12px}
+  .mark .c{border-radius:50%; background:var(--red)}
+  .mark .s{background:var(--cobalt)}
+  .mark .t{width:0; height:0; background:none; border-left:7px solid transparent; border-right:7px solid transparent; border-bottom:12px solid var(--yellow)}
+
+  /* Keys: ivory plastic cylinders with chrome rings — cap up on translateZ, side wall toward the viewer, two shadows on the plate */
+  .deck{position:absolute; inset:0; transform-style:preserve-3d}
+  .key{position:absolute; left:0; top:0; width:40px; height:40px; border-radius:50%; cursor:pointer; -webkit-tap-highlight-color:transparent; outline:none;
+    transform:translate3d(var(--kx), var(--ky), 0); transform-style:preserve-3d; transition:transform var(--t-release) var(--ease-spring)}   /* spring back after release */
+  .key:hover{transform:translate3d(var(--kx), var(--ky), 1.5px)}
+  .key:hover .cap{filter:brightness(1.035)}
+  .key.down, .key.down:hover{transform:translate3d(var(--kx), var(--ky), -6px); transition:transform var(--t-press) var(--ease-in)}
+  .key.wide{width:72px; border-radius:20px} .key.space{width:300px; border-radius:20px}
+  .key .ao{ /* three shadow layers on the plate: contact, key light, ambient */
+    position:absolute; inset:1px; border-radius:inherit; transform:translate(2px, 3px) translateZ(.6px); background:transparent;
+    box-shadow:1px 1px 3px 1px rgba(var(--sh),.36), 7px 6px 8px 2px rgba(var(--sh),.28), 14px 12px 22px 4px rgba(var(--sh),.12)}
+  .key .ring{ /* the cylinder wall, stacked slices, so it wraps every key from any angle */
+    position:absolute; inset:0; border-radius:inherit; transform:translateZ(calc(var(--kh) * var(--f)));
+    background:
+      linear-gradient(rgba(40,34,26,calc(.3 - var(--f) * .3)), rgba(40,34,26,calc(.3 - var(--f) * .3))),   /* darker toward the base */
+      linear-gradient(90deg, #948b7c 0%, #b8af9f 12%, #dbd3c4 34%, #e2dacb 50%, #d8d0c0 66%, #b2a998 88%, #8a8171 100%)}
+  .key .bezel{ /* chrome ring that clamps the legend, sits just under the cap and a hair wider */
+    position:absolute; inset:-1.5px; border-radius:inherit; transform:translateZ(calc(var(--kh) - 1.2px));
+    background:var(--chrome-ring); box-shadow:0 0 0 .5px rgba(30,32,34,.6), inset 0 0 0 .5px rgba(255,255,255,.7)}
+  .key .cap{position:absolute; inset:0; border-radius:inherit; display:grid; place-items:center; transform:translateZ(var(--kh)) rotateX(-6deg); transform-origin:50% 100%;
+    color:#2a2723; font-size:12.5px; font-weight:500; letter-spacing:.06em; text-transform:uppercase; line-height:1; padding-top:1px;
+    text-shadow:0 .6px 0 rgba(255,255,255,.55), 0 0 .5px rgba(0,0,0,.25); border:2.2px solid transparent; transition:filter .2s;
+    background:
+      radial-gradient(circle at 50% 62%, rgba(60,50,40,.12), rgba(60,50,40,0) 60%) padding-box,             /* dished centre */
+      radial-gradient(circle at 42% 34%, #fff, #e9e6df 55%, #d2cec4) padding-box,                             /* §3.3 matte plastic: no highlight streak */
+      var(--chrome-ring) border-box;
+    box-shadow:inset 0 1px 0 #fff, inset 0 -3px 4px rgba(0,0,0,.10), inset 0 0 0 .6px rgba(60,50,40,.16)}
+  .key.wide .cap, .key.space .cap{font-size:10.5px; letter-spacing:.14em}
+  .key.wide .cap, .key[data-key="Enter"] .cap{background:   /* function keys: the darker grey of §3.3 base plastic, no colour */
+      radial-gradient(circle at 50% 62%, rgba(60,50,40,.10), rgba(60,50,40,0) 60%) padding-box,
+      radial-gradient(circle at 42% 34%, #ece8df, #dfdad0 55%, #c9c4b8) padding-box, var(--chrome-ring) border-box}
+  .key:focus-visible .cap{outline:2px solid var(--cobalt); outline-offset:2px}
+
+  /* Carriage: lies on the plate at y=100 and slides along a chrome rail with --cx. Everything here is seen from above. */
+  .carriage{position:absolute; left:0; right:0; top:100px; height:0; transform-style:preserve-3d; transform:translateX(var(--cx)); transition:transform .06s linear}
+  .carriage.return{transition:transform var(--t-return) var(--ease-spring)}
+  .carriage .sh{position:absolute; pointer-events:none}
+  .carriage .sh.platen-sh{left:100px; right:80px; top:-14px; height:52px; border-radius:26px; background:var(--shadow-part); box-shadow:0 0 12px 6px var(--shadow-part); transform:translate(10px, 8px) translateZ(.5px)}
+  .carriage .sh.paper-sh{left:150px; right:140px; top:-80px; height:56px; border-radius:20px; background:rgba(var(--sh),.16); box-shadow:0 0 24px 14px rgba(var(--sh),.16); transform:translate(10px, 8px) translateZ(.4px)}
+  .carriage .sh.knob-glow{top:-16px; width:84px; height:74px; border-radius:50%; background:radial-gradient(closest-side, var(--shadow-part), transparent); transform:translate(10px, 8px) translateZ(.3px)}
+  .carriage .sh.knob-glow.l{left:36px} .carriage .sh.knob-glow.r{right:6px}
+  .rail{position:absolute; left:60px; right:60px; top:-4px; height:8px; border-radius:4px; transform:translateZ(5px);
+    background:var(--chrome-bar)}
+  .rail::after{content:""; position:absolute; left:0; right:0; top:4px; height:8px; border-radius:4px; background:transparent; box-shadow:0 0 5px 2px var(--shadow-part); transform:translate(8px, 7px) translateZ(-4px)}
+  .platen{position:absolute; left:84px; right:84px; top:-26px; height:52px; border-radius:26px; transform:translateZ(46px);
+    background:var(--grain), linear-gradient(180deg, #08090b 0%, #16171a 7%, #2a2c30 17%, #43454a 29%, #5a5c61 37%, #4a4c50 46%, #2e3034 58%, #1c1d20 72%, #121316 86%, #06070a 100%);
+    background-blend-mode:overlay, normal; background-size:120px 120px, auto;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.2)}
+  .platen::before{content:""; position:absolute; left:60px; right:60px; top:16px; height:3px; border-radius:2px; background:rgba(255,255,255,.16)}
+  .collar{position:absolute; top:-26px; width:14px; height:52px; border-radius:3px; transform:translateZ(46px);
+    background:var(--chrome-bar);
+    box-shadow:inset 1px 0 0 rgba(255,255,255,.35), inset -1px 0 0 rgba(0,0,0,.35)}
+  .collar.l{left:71px} .collar.r{right:71px}
+  .knob{position:absolute; top:-32px; width:52px; height:64px; border-radius:12px; transform:translateZ(46px);
+    background:
+      repeating-linear-gradient(180deg, rgba(255,255,255,0) 0, rgba(255,255,255,.22) 1.6px, rgba(255,255,255,.22) 2.6px, rgba(0,0,0,.45) 4.2px, rgba(0,0,0,0) 5.4px, rgba(0,0,0,0) 8px),
+      linear-gradient(180deg, #14161a 0%, #23262b 10%, #35393f 22%, #4a4f56 34%, #5a6068 44%, #4a4f56 56%, #35393f 70%, #23262b 84%, #15171b 100%);
+    background-position:0 var(--rot, 0px), 0 0;
+    border:1px solid rgba(255,255,255,.18);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.18), 4px 6px 10px -4px rgba(var(--sh),.45);
+    transition:background-position var(--t-return) var(--ease-spring), filter .2s}
+  .knob::before{ /* specular line along the axis, where the softbox reflects */
+    content:""; position:absolute; left:6px; right:6px; top:40%; height:2px; border-radius:2px; background:rgba(255,255,255,.14)}   /* matte: only a faint edge, no specular */
+  .knob::after{ /* chrome end cap on the outer face */
+    content:""; position:absolute; top:-1px; bottom:-1px; width:7px; background:var(--chrome-bar); box-shadow:0 0 0 .5px rgba(30,32,34,.5)}
+  .knob.l::after{left:-1px; border-radius:12px 2px 2px 12px} .knob.r::after{right:-1px; border-radius:2px 12px 12px 2px}
+    .knob{cursor:pointer} .knob:hover{filter:brightness(1.12)}
+  .knob.l{left:20px} .knob.r{right:20px}
+  .bail{position:absolute; left:170px; right:170px; top:24px; height:5px; border-radius:3px; transform:translateZ(48px);
+    background:linear-gradient(180deg, var(--chrome-c), var(--chrome-a) 40%, var(--chrome-d))}
+  .bail i{position:absolute; top:-6px; width:30px; height:17px; border-radius:5px; background:linear-gradient(180deg, var(--rubber-e), var(--rubber-a) 50%, var(--rubber-e))}
+  .bail i:first-child{left:18%} .bail i:last-child{right:18%}
+  .ruler{position:absolute; left:120px; right:120px; top:36px; height:10px; transform:translateZ(30px);
+    background:
+      repeating-linear-gradient(90deg, rgba(27,28,30,.75) 0 1px, transparent 1px 45px) 0 0 / 45px 100% repeat-x,   /* long tick every 5 */
+      repeating-linear-gradient(90deg, rgba(27,28,30,.6) 0 1px, transparent 1px 9px) 0 0 / 9px 55% repeat-x,          /* short ticks */
+      var(--brush) 0 0 / 400px 120px,
+      linear-gradient(180deg, #e3e6e9 0%, #d3d7da 30%, #c2c7cb 70%, #aeb3b8 100%);
+    background-blend-mode:normal, normal, overlay, normal;
+    box-shadow:0 1px 0 rgba(255,255,255,.85) inset, 0 -1px 0 rgba(60,64,70,.35) inset}
+  .ruler::after{content:""; position:absolute; left:0; right:0; top:0; height:100%; background:transparent; box-shadow:0 0 5px 2px var(--shadow-part); transform:translate(8px, 7px) translateZ(-28px)}
+  .vibrator{ /* card guide: a small chrome bracket in front of the roller, the red ribbon runs through it */
+    position:absolute; left:50%; top:20px; width:46px; height:18px; margin-left:-23px; border-radius:3px;
+    transform:translateZ(24px) translateY(var(--vib, 0px)); transition:transform .06s ease-out;
+    background:linear-gradient(180deg, var(--chrome-b), var(--chrome-a) 30%, var(--chrome-c) 60%, var(--chrome-d));
+    box-shadow:1px 2px 3px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.7)}
+  .vibrator::before{content:""; position:absolute; left:50%; top:-7px; width:3px; height:9px; margin-left:-1.5px; background:var(--chrome-c)}
+  .vibrator::after{content:""; position:absolute; left:10px; right:10px; top:7px; height:3px; background:var(--red); box-shadow:0 1px 0 rgba(0,0,0,.4)}
+
+  #typein{position:fixed; left:0; bottom:0; width:1px; height:1px; opacity:0; border:0; padding:0; pointer-events:none}
+
+  @media (max-width:700px){
+    .paper{padding:24px 20px 70px}
+    .paper-zone{top:60px}
+    .topbar{padding:0 12px} .topbar .crumb{display:none}
+  }
+  @media (max-height:560px){ .paper-zone{top:56px} }
+  @media (prefers-reduced-motion: reduce){ .paper.rising{animation:none} }
+
+  /* ───────── Print: only the résumé ───────── */
+  #print-resume{display:none}
+  @media print{
+    @page{margin:16mm 18mm}
+    body{overflow:visible; background:#fff; color:#111}
+    .room, .topbar, .stage{display:none !important}
+    #print-resume{display:block; font-family:Georgia, "Times New Roman", serif; font-size:10.5pt; line-height:1.4; color:#111}
+    #print-resume h1{font-family:"Jost", Helvetica, Arial, sans-serif; font-size:20pt; letter-spacing:.06em; text-transform:uppercase; margin:0 0 2pt}
+    #print-resume .contact{font-size:9.5pt; color:#444; margin:0 0 10pt; padding-bottom:6pt; border-bottom:1.2pt solid #111}
+    #print-resume h2{font-family:"Jost", Helvetica, Arial, sans-serif; font-size:10pt; letter-spacing:.16em; text-transform:uppercase; margin:12pt 0 4pt; padding-bottom:2pt; border-bottom:.6pt solid #999}
+    #print-resume .role{display:flex; justify-content:space-between; gap:12pt; margin-top:7pt; font-weight:bold}
+    #print-resume .role span:last-child{font-weight:normal; color:#444; white-space:nowrap}
+    #print-resume .where{color:#444; font-style:italic; margin-bottom:2pt}
+    #print-resume ul{margin:2pt 0 0; padding-left:14pt}
+    #print-resume li{margin:0 0 1.5pt}
+    #print-resume p{margin:0 0 4pt}
+  }
+</style>
+
+<div class="room" aria-hidden="true"></div>
+
+<header class="topbar">
+  <span class="caption"><a href="/" aria-label="Back to portfolio">&larr; back</a><span><b>about</b> &middot; typewriter no.01 &mdash; <span id="status">ready</span></span></span>
+  <button id="soundBtn" type="button" aria-pressed="true"><span class="dot" id="led" aria-hidden="true"></span> sound on</button>
+</header>
+<div class="dof" aria-hidden="true"><i></i><i></i><i></i></div>
+
+<main class="stage" id="stage">
+  <section class="paper-zone" id="paperZone">
+    <div class="paper rising" id="paper" aria-live="polite">
+      <div class="sheet" id="sheet">
+        <div class="paper-head"><span>yanice yang . 2026</span><span>about</span></div>
+        <div id="lines"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="scene" aria-label="typewriter">
+    <div class="rig" id="rig">
+      <div class="floor" aria-hidden="true">
+        <i class="grain"></i>
+        <i class="ambient"></i><i class="contact"></i>
+        <i class="part sl"></i><i class="part sr"></i><i class="part seg"></i>
+
+      </div>
+
+      <div class="face back" aria-hidden="true"></div>
+      <div class="side l" aria-hidden="true"></div>
+      <div class="side r" aria-hidden="true"></div>
+
+      <div class="face inner" id="inner" aria-hidden="true">
+        <div class="spool l"><i></i></div><div class="spool r"><i></i></div>
+        <div class="ribbon"></div>
+        <div class="segment"></div>
+        <div class="typebar"></div>
+        <i class="sticker c"></i><i class="sticker s"></i><i class="sticker t"></i><i class="sticker label"></i>
+      </div>
+
+      <div class="face top">
+        <div class="window" aria-hidden="true"></div>
+        <div class="groove" aria-hidden="true"></div>
+        <div class="deckplate" aria-hidden="true"></div>
+        <i class="screw a" aria-hidden="true"></i><i class="screw b" aria-hidden="true"></i><i class="screw c" aria-hidden="true"></i><i class="screw d" aria-hidden="true"></i>
+        <div class="deck" id="deck" role="group" aria-label="on-screen keyboard"></div>
+
+        <div class="carriage" id="carriage" aria-hidden="true">
+          <i class="sh paper-sh"></i><i class="sh platen-sh"></i><i class="sh knob-glow l"></i><i class="sh knob-glow r"></i>
+          <div class="rail"></div>
+          <div class="platen" id="platen"></div>
+          <div class="collar l"></div><div class="collar r"></div>
+          <div class="knob l"></div><div class="knob r"></div>
+          <div class="bail"><i></i><i></i></div>
+          <div class="ruler"></div>
+          <div class="vibrator" id="vibrator"></div>
+        </div>
+      </div>
+
+      <div class="face front" aria-hidden="true"></div>
+    </div>
+  </section>
+
+  <label for="typein" hidden>Type your question</label>
+  <input id="typein" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Type your question">
+</main>
+
+<!-- Print-only résumé. Add phone or other details here before publishing if you want them on the printed page. -->
+<div id="print-resume">
+  <h1>Yanice Yang</h1>
+  <p class="contact">Senior Product Designer &middot; Santa Clara, CA &middot; yaniceydesign@gmail.com &middot; yaniceyang.com &middot; linkedin.com/in/yanice-yang</p>
+  <h2>Summary</h2>
+  <p>Senior Product Designer with 5 years of experience designing AI-native and agentic workflows, B2B SaaS tools, creator products, and productivity systems. Translates ambiguous AI capabilities into user-facing interaction models, design system patterns, prototypes, and measurable product outcomes. Strong in end-to-end product design, user research, workflow strategy, rapid prototyping, and cross-functional collaboration with product, engineering, data, and business stakeholders.</p>
+
+  <h2>Experience</h2>
+  <div class="role"><span>Lead Product Designer, AtlasNova.AI</span><span>Sep 2025 – Present</span></div>
+  <ul>
+    <li>Led end-to-end product design from 0 to 1 for an agentic AI marketing and operations platform serving 1,000+ SMB operators, defining scope, flows, requirements, and launch-ready experiences with founders, PM, engineering, and business stakeholders.</li>
+    <li>Led a design team of 3 designers plus interns, setting direction, reviewing quality, and coordinating delivery across modules, prototypes, and implementation handoff.</li>
+    <li>Built an AI-readable design system: production-grounded design tokens plus a machine-consumable design-handoff contract, reusable by engineers and by code-generating AI tools.</li>
+    <li>Designed agentic GenAI workflows for campaign creation, creative generation, and agent-led operator automation, translating research into prompt controls, brand grounding, review states, and reusable agent interaction patterns that reduced hallucination risk and improved output trust.</li>
+    <li>Designed Ads Manager workflows across Meta, TikTok, and Google Ads for web and mobile, from creative generation and targeting through launch, monitoring, and performance review.</li>
+    <li>Shipped production front-end code via pull requests into the engineering repository: brand kit, competitive analysis, and component generation flows in React, TypeScript, Tailwind, and shadcn/ui. Delivered the revamped UI component set as code, reducing design-to-development handoff time by 30–40%.</li>
+  </ul>
+  <div class="role"><span>Senior Product Designer, Cummins Inc.</span><span>Jun 2023 – Sep 2025</span></div>
+  <div class="where">New York, NY</div>
+  <ul>
+    <li>Led end-to-end design for Guidanz, a web and mobile SaaS product helping technicians diagnose and repair heavy-duty engines, improving task efficiency by 31.2% through research, workflow redesign, prototyping, and usability testing.</li>
+    <li>Built a design system from the ground up, reducing design-to-development handoff time by 50% and improving cross-platform consistency.</li>
+    <li>Redesigned online diagnostic sessions by reframing the information architecture and introducing a side panel, helping technicians resolve field-service issues faster.</li>
+    <li>Conducted on-site research with certified Cummins technicians; findings directly informed product iterations and improved task completion.</li>
+  </ul>
+  <div class="role"><span>UX Strategy Intern, Thunderbit AI</span><span>May 2023 – Dec 2023</span></div>
+  <ul>
+    <li>Led design strategy and early business-use-case exploration for the MVP, supporting growth from zero to 5K daily active users and the monetization roadmap.</li>
+    <li>Led global expert and user interviews to define core flows; introduced LLM-driven design thinking and early prompt-design experiments for user–agent co-creation.</li>
+  </ul>
+  <div class="role"><span>Summer Digital Analyst, McKinsey &amp; Company</span><span>Jun 2022 – Aug 2022</span></div>
+  <div class="where">New York, NY</div>
+  <ul>
+    <li>Shipped a 0-to-1 live-streamed shopping experience within 8 weeks, reaching 100% user satisfaction in the tested experience.</li>
+    <li>Built core flows for a global data analysis platform, contributing to a 20% rise in user adoption; contributed 50+ components and 10+ interaction patterns to the McKinsey Digital design system.</li>
+  </ul>
+  <div class="role"><span>Product Designer, Lark &amp; TikTok, ByteDance</span><span>Oct 2020 – Aug 2021</span></div>
+  <ul>
+    <li>Iterated 3+ core cross-platform features for Lark, improving user productivity by 50% through onboarding redesign, search improvements, and team-collaboration flows.</li>
+    <li>Assessed content-moderation strategy for TikTok Trust &amp; Safety through 30+ global expert interviews and surveys of more than 10,000 users.</li>
+  </ul>
+  <div class="role"><span>Product Designer, Xiaomi Financial Global</span><span>Oct 2019 – Oct 2020</span></div>
+  <ul>
+    <li>Rebuilt 10+ account-creation and financial-product flows for Mi Finance; improved account opening and rebuilt the dashboard information architecture, increasing conversion by 25%.</li>
+    <li>Collaborated with brand design to build the Airstar Bank Global design system.</li>
+  </ul>
+
+  <h2>Selected Project</h2>
+  <p><strong>Opus Clip (2025)</strong> — Designed a new AI prompt-based video generation feature for the web product, from creator research and usability testing to interaction design and launch-ready specs; synthesized 10+ interviews and 500+ survey responses into a workflow where users search footage, generate storyboards, edit voiceover, and keep control over AI output.</p>
+
+  <h2>Education</h2>
+  <div class="role"><span>University of Michigan — M.S. Information, Human-Computer Interaction (GPA 4.0)</span><span>2021 – 2023</span></div>
+  <div class="role"><span>Pratt Institute — B.F.A., Dean's Honor List, 4 years</span><span>2015 – 2019</span></div>
+
+  <h2>Awards</h2>
+  <ul>
+    <li>IDEA Design Award 2026 Winner; iF Design Award Winner; Red Dot Design Award Winner — design for accessibility</li>
+    <li>A' Design Award Winner — AI product interface and interaction design</li>
+    <li>VEGA Design Award Gold — The Future of At-Home AI Concert; MUSE Design Award Platinum — OpusClip AI creative workflow</li>
+  </ul>
+
+  <h2>Publications (IEEE)</h2>
+  <ul>
+    <li>DeepSORT-Driven Visual Tracking Approach for Gesture Recognition in Interactive Systems, 2025</li>
+    <li>Generative Modeling of Human-Computer Interfaces with Diffusion Processes and Conditional Control, 2025</li>
+    <li>Toward Natural and Intuitive Human-Computer Interface, 2024 · Optimizing Gesture Recognition for Seamless UI Interaction, 2024</li>
+  </ul>
+
+  <h2>Skills</h2>
+  <p><strong>Design:</strong> AI-native design workflow, AI-assisted prototyping, product strategy, interaction design, design systems, user research, usability testing, information architecture, accessibility, responsive layouts, A/B testing, design QA.<br>
+  <strong>AI product:</strong> GenAI and agentic workflows, agent interaction patterns, prompt design and controls, human-in-the-loop review, output trust, brand grounding, AI-readable design system structure.<br>
+  <strong>Technical:</strong> React, TypeScript, Tailwind, shadcn/ui, Astro, JavaScript, HTML/CSS, WebGL, Supabase, Vercel, Git and PR review, REST API integration.<br>
+  <strong>Tools:</strong> Figma, Claude Code, Codex, Cursor, ChatGPT, Perplexity, Canva, AI image and video generation.</p>
+</div>
+
+<script>
+(() => {
+  // ───────── Config ─────────
+  // Drop screenshot URLs here (or data: URIs). Empty = a labelled placeholder frame is shown on the paper.
+  const IMAGES = { atlasnova: '', cummins: '', code: '' };
+  const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const $ = s => document.querySelector(s);
+  const stage = $('#stage'), paperZone = $('#paperZone'), paper = $('#paper'), sheet = $('#sheet'), lines = $('#lines'), typein = $('#typein');
+  const deck = $('#deck'), soundBtn = $('#soundBtn'), carriage = $('#carriage'), platen = $('#platen');
+  const inner = $('#inner'), vibrator = $('#vibrator');
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+
+  // Refraction: a faint, offset second image of the internals seen through the glass
+  const ghost = inner.cloneNode(true); ghost.classList.add('ghost'); ghost.removeAttribute('id'); inner.after(ghost);
+  const typebars = document.querySelectorAll('.typebar'), spoolsL = document.querySelectorAll('.spool.l'), spoolsR = document.querySelectorAll('.spool.r');
+  const knobs = document.querySelectorAll('.knob');
+
+  // ───────── Fit: scale the whole scene, then tuck the paper behind the platen ─────────
+  let sc = 1;
+  const scene = document.querySelector('.scene');
+  function fit() {
+    // Camera close to the sheet: the machine spans the full width and is cropped by the bottom of the frame,
+    // leaving the platen, the ruler and the first rows of keys in view.
+    // The whole keyboard stays in view (your real keystrokes light up the keys); the sheet keeps at least ~55% of the height.
+    sc = Math.min(1.6, innerWidth / 1000, (innerHeight * 0.55 - 60) / 221);
+    stage.style.setProperty('--sc', sc.toFixed(3));
+    scene.style.bottom = (-180 * sc).toFixed(1) + 'px';
+    // Then measure: lift the machine until the space bar sits 26px above the bottom edge (perspective makes the near rows drop more than geometry says).
+    const space = deck.querySelector('.key.space');
+    if (space) { const b = space.getBoundingClientRect().bottom; scene.style.bottom = (parseFloat(scene.style.bottom) + (b - (innerHeight - 26))).toFixed(1) + 'px'; }   // b below the frame → lift
+    const r = platen.getBoundingClientRect();
+    paperZone.style.bottom = Math.round(innerHeight - (r.top + r.height * 0.5)) + 'px';
+  }
+  fit(); addEventListener('resize', fit);
+
+  // §1 camera follows the pointer a little (half the system's amplitude, so the keyboard never seems to drift), 350ms ease-out
+  const rig = $('#rig');
+  if (!REDUCED) addEventListener('pointermove', e => {
+    const x = e.clientX / innerWidth - .5, y = e.clientY / innerHeight - .5;
+    rig.style.setProperty('--tilt', (52 + y * 3).toFixed(2) + 'deg'); rig.style.setProperty('--yaw', (x * 4).toFixed(2) + 'deg');
+  });
+  const statusEl = $('#status'), led = $('#led');
+  function setStatus(t, busyState) { statusEl.textContent = t; led.classList.toggle('busy', !!busyState); }
+
+  // Hand-ruled lines for the sheet: a slightly wandering stroke, solid for the header, dotted for headings
+  function ruled(dotted) {
+    const w = 600; let d = 'M0 3';
+    for (let x = 10; x <= w; x += 10) d += ` L${x} ${(3 + (Math.random() - .5) * 2.4).toFixed(1)}`;
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='${w}' height='6'><path d='${d}' fill='none' stroke='#2A231B' stroke-opacity='.85' stroke-width='${dotted ? 1.3 : 1.6}' stroke-linecap='round'${dotted ? " stroke-dasharray='1.4 3.2'" : ''}/></svg>`;
+    return `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}")`;
+  }
+  stage.style.setProperty('--rule', ruled(false)); stage.style.setProperty('--rule-dotted', ruled(true));
+
+  // ───────── Sound: synthesized in-browser, no files ─────────
+  const sound = {
+    on: true, ctx: null,
+    ensure() {
+      if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      if (this.ctx.state === 'suspended') this.ctx.resume();
+      return this.ctx;
+    },
+    noise(c, dur, filter, gain, t) {
+      const buf = c.createBuffer(1, Math.floor(c.sampleRate * dur), c.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 2);
+      const src = c.createBufferSource(); src.buffer = buf;
+      src.connect(filter).connect(gain).connect(c.destination); src.start(t);
+    },
+    click(v = 1) {
+      if (!this.on) return;
+      const c = this.ensure(), t = c.currentTime;
+      const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 2100 + Math.random() * 900; bp.Q.value = 0.9;
+      const g = c.createGain(); g.gain.setValueAtTime(0.22 * v, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
+      this.noise(c, 0.04, bp, g, t);
+      const o = c.createOscillator(); o.type = 'triangle';
+      o.frequency.setValueAtTime(300, t); o.frequency.exponentialRampToValueAtTime(80, t + 0.05);
+      const g2 = c.createGain(); g2.gain.setValueAtTime(0.10 * v, t); g2.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+      o.connect(g2).connect(c.destination); o.start(t); o.stop(t + 0.09);
+      const o2 = c.createOscillator(); o2.type = 'sine'; o2.frequency.value = 1600 + Math.random() * 500;
+      const g3 = c.createGain(); g3.gain.setValueAtTime(0.05 * v, t); g3.gain.exponentialRampToValueAtTime(0.001, t + 0.035);
+      o2.connect(g3).connect(c.destination); o2.start(t); o2.stop(t + 0.04);
+    },
+    bell() {
+      if (!this.on) return;
+      const c = this.ensure(), t = c.currentTime;
+      [[2093, 0.16, 0.9], [3136, 0.07, 0.55], [4186, 0.03, 0.35]].forEach(([f, v, d]) => {
+        const o = c.createOscillator(); o.type = 'sine'; o.frequency.value = f;
+        const g = c.createGain(); g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(0.0005, t + d);
+        o.connect(g).connect(c.destination); o.start(t); o.stop(t + d + 0.02);
+      });
+    },
+    zip() {
+      if (!this.on) return;
+      const c = this.ensure(), t = c.currentTime;
+      const hp = c.createBiquadFilter(); hp.type = 'highpass';
+      hp.frequency.setValueAtTime(600, t); hp.frequency.exponentialRampToValueAtTime(3200, t + 0.16);
+      const g = c.createGain(); g.gain.setValueAtTime(0.09, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+      this.noise(c, 0.18, hp, g, t);
+      const o = c.createOscillator(); o.type = 'triangle'; o.frequency.setValueAtTime(180, t + 0.2); o.frequency.exponentialRampToValueAtTime(60, t + 0.26);
+      const g2 = c.createGain(); g2.gain.setValueAtTime(0.0001, t); g2.gain.setValueAtTime(0.12, t + 0.2); g2.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+      o.connect(g2).connect(c.destination); o.start(t); o.stop(t + 0.32);
+    }
+  };
+  soundBtn.addEventListener('click', () => {
+    sound.on = !sound.on;
+    soundBtn.setAttribute('aria-pressed', String(sound.on));
+    soundBtn.lastChild.textContent = sound.on ? ' sound on' : ' sound off';
+    if (sound.on) sound.click();
+    focusInput();
+  });
+
+  // ───────── Keyboard on the top plate. Rows step up toward the back like a real machine ─────────
+  const ROWS = [
+    { y: 172, h: 38, stagger: 0,   keys: ['1','2','3','4','5','6','7','8','9','0', {k:'Backspace', l:'del', w:1}] },
+    { y: 212, h: 32, stagger: 14,  keys: ['q','w','e','r','t','y','u','i','o','p'] },
+    { y: 252, h: 26, stagger: 0,   keys: ['a','s','d','f','g','h','j','k','l', {k:'Enter', l:'return', w:1}] },
+    { y: 292, h: 20, stagger: -12, keys: [{k:'Shift', l:'shift', w:1}, 'z','x','c','v','b','n','m', ',', '.'] },
+    { y: 324, h: 16, stagger: 0,   keys: [{k:' ', l:'', space:1}] }
+  ];
+  const GAP = 6;
+  ROWS.forEach(row => {
+    const defs = row.keys.map(d => typeof d === 'string' ? {k:d, l:d} : d);
+    const widths = defs.map(d => d.space ? 300 : d.w ? 72 : 40);
+    const total = widths.reduce((a, b) => a + b, 0) + GAP * (defs.length - 1);
+    let x = (880 - total) / 2 + row.stagger;
+    defs.forEach((d, i) => {
+      const el = document.createElement('div');
+      el.className = 'key' + (d.w ? ' wide' : '') + (d.space ? ' space' : '');
+      el.setAttribute('role', 'button'); el.tabIndex = 0;
+      el.dataset.key = d.k; el.setAttribute('aria-label', d.k === ' ' ? 'space' : d.k);
+      el.style.setProperty('--kx', x + 'px'); el.style.setProperty('--ky', (row.y - 20) + 'px'); el.style.setProperty('--kh', row.h + 'px');
+      el.style.setProperty('--jit', ((Math.random() - .5) * 16).toFixed(1) + 'deg');   // no two keys catch the light identically
+      const rings = Array.from({length: 12}, (_, i) => (0.02 + i * 0.084).toFixed(3)).map(f => `<span class="ring" style="--f:${f}"></span>`).join('');
+      el.innerHTML = `<span class="ao"></span>${rings}<span class="bezel"></span><span class="cap">${d.l}</span>`;
+      el.addEventListener('pointerdown', e => e.preventDefault());
+      el.addEventListener('click', () => { handleKey(d.k); focusInput(); });
+      el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleKey(d.k); } });
+      deck.appendChild(el);
+      x += widths[i] + GAP;
+    });
+  });
+  const keyEls = new Map([...deck.querySelectorAll('.key')].map(b => [b.dataset.key, b]));
+  function pressKey(k) {
+    const el = keyEls.get(k) || keyEls.get(String(k).toLowerCase());
+    if (!el) return;
+    el.classList.add('down'); setTimeout(() => el.classList.remove('down'), 90);
+  }
+  function randomKey() { const ks = [...keyEls.keys()].filter(k => k.length === 1 && k !== ' '); return ks[Math.floor(Math.random() * ks.length)]; }
+
+  // ───────── Mechanics: typebar strike, spools, carriage on its rail, knobs turning with the paper ─────────
+  let strikeSide = 1, spin = 0, cx = 0, feed = 0;
+  function strike() {
+    if (REDUCED) return;
+    typebars.forEach(t => t.style.setProperty('--tb', '0deg'));
+    vibrator.style.setProperty('--vib', '-5px');
+    spin += 7; spoolsL.forEach(s => s.style.setProperty('--spin', spin + 'deg')); spoolsR.forEach(s => s.style.setProperty('--spin', spin + 'deg'));
+    setTimeout(() => {
+      strikeSide = -strikeSide;
+      typebars.forEach(t => t.style.setProperty('--tb', (strikeSide * 76) + 'deg'));
+      vibrator.style.setProperty('--vib', '0px');
+    }, 80);
+    paper.animate([{transform:'translate(0,0)'}, {transform:'translate(-.6px,-1px)'}, {transform:'translate(0,0)'}], {duration: 55, composite: 'add'});
+  }
+  function setCx() { carriage.style.setProperty('--cx', cx + 'px'); paper.style.setProperty('--cx', (cx * sc) + 'px'); }
+  function carriageStep() { if (REDUCED) return; cx = Math.max(-64, cx - 4); carriage.classList.remove('return'); paper.classList.remove('return'); setCx(); }
+  function carriageBack() { cx = Math.min(0, cx + 4); setCx(); }
+  function carriageReturn() {
+    feed += 22; setKnobs();                                  // line feed: the platen turns a notch
+    if (cx === 0) return;
+    cx = 0; carriage.classList.add('return'); paper.classList.add('return'); setCx();
+  }
+  function setKnobs() { const rot = sheet.scrollTop * 0.9 + feed; knobs.forEach(k => k.style.setProperty('--rot', rot.toFixed(1) + 'px')); }
+  sheet.addEventListener('scroll', setKnobs, {passive: true});
+  // The knobs are controls: click one to feed the paper a line
+  knobs.forEach(k => k.addEventListener('click', () => { sheet.scrollBy({top: 30, behavior: 'smooth'}); feed += 22; setKnobs(); sound.click(0.6); focusInput(); }));
+
+  // Deckled top edge of the sheet
+  (function deckle() {
+    const pts = ['0% 100%']; const n = 96;
+    for (let i = 0; i <= n; i++) pts.push(`${(i / n * 100).toFixed(2)}% ${(2 + Math.random() * 2.6 + (i % 9 === 0 ? 1.6 : 0)).toFixed(1)}px`);
+    pts.push('100% 100%'); sheet.style.setProperty('--deckle', `polygon(${pts.join(',')})`);
+  })();
+
+  paper.addEventListener('animationend', () => paper.classList.remove('rising'));
+
+  // ───────── Paper: the conversation ─────────
+  let buffer = '', busy = false, skip = false;
+  const cur = document.createElement('p'); cur.className = 'line you current';
+  const curText = document.createTextNode(''); const curCaret = document.createElement('span'); curCaret.className = 'caret';
+  cur.append(curText, curCaret); lines.appendChild(cur);
+
+  function scrollDown() { sheet.scrollTop = sheet.scrollHeight; }
+  function renderBuffer() { curText.data = buffer; scrollDown(); }
+  function focusInput() { typein.focus({preventScroll: true}); }
+
+  function handleKey(k) {
+    if (k === 'Shift') { pressKey(k); sound.click(0.7); return; }
+    pressKey(k); sound.click();
+    if (busy) { skip = true; if (k === 'Enter') return; }
+    if (k === 'Enter') { submit(); return; }
+    if (k === 'Backspace') { buffer = buffer.slice(0, -1); carriageBack(); }
+    else if (k.length === 1) { buffer += k; strike(); carriageStep(); }
+    typein.value = buffer; renderBuffer();
+  }
+
+  let handledByKeydown = false;
+  typein.addEventListener('keydown', e => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.key === 'Enter' || e.key === 'Backspace' || e.key === 'Shift' || e.key.length === 1) {
+      e.preventDefault(); handledByKeydown = true; handleKey(e.key);
+    }
+  });
+  typein.addEventListener('input', () => {
+    if (!handledByKeydown) { buffer = typein.value; renderBuffer(); pressKey(randomKey()); sound.click(); strike(); carriageStep(); }
+    handledByKeydown = false;
+  });
+  stage.addEventListener('pointerdown', e => {
+    if (e.target.closest('button, a, .key')) return;
+    if (busy) skip = true;
+    setTimeout(focusInput, 0);
+  });
+  window.addEventListener('keydown', e => {
+    if (document.activeElement !== typein && !e.target.closest('button, a, input, .key') && !e.metaKey && !e.ctrlKey) focusInput();
+  });
+
+  function submit() {
+    const text = buffer.trim();
+    if (!text) return;
+    buffer = ''; typein.value = ''; renderBuffer();
+    const you = document.createElement('p'); you.className = 'line you'; you.textContent = text;
+    lines.insertBefore(you, cur); sound.zip(); carriageReturn(); scrollDown();
+    respond(route(text));
+  }
+
+  async function typeInto(el, text, speed) {
+    const tn = document.createTextNode(''); const caret = document.createElement('span'); caret.className = 'caret';
+    el.append(tn, caret); scrollDown();
+    for (const ch of text) {
+      if (skip) { tn.data = text; break; }
+      tn.data += ch;
+      if (ch !== ' ') { sound.click(0.45); strike(); pressKey(ch); } else pressKey(' ');
+      carriageStep();
+      scrollDown();
+      await wait(speed + Math.random() * speed * 0.7 + (/[.,;:!?]/.test(ch) ? 120 : 0));
+    }
+    caret.remove();
+  }
+
+  const SPEED = { h: 38, p: 17, li: 12 };
+  async function renderBlock(b) {
+    if (b.t === 'choices') { lines.insertBefore(choiceRow(b.items), cur); scrollDown(); return; }
+    if (b.t === 'img') {
+      const fig = document.createElement('figure'); fig.className = 'photo';
+      if (IMAGES[b.key]) { const im = document.createElement('img'); im.src = IMAGES[b.key]; im.alt = b.alt || b.cap; fig.appendChild(im); }
+      else { const ph = document.createElement('div'); ph.className = 'ph'; ph.textContent = `[ image: ${b.cap} — set IMAGES.${b.key} in the script ]`; fig.appendChild(ph); }
+      const fc = document.createElement('figcaption'); fc.textContent = b.cap; fig.appendChild(fc);
+      lines.insertBefore(fig, cur); scrollDown(); if (!skip) await wait(350); return;
+    }
+    if (b.t === 'hint') { const p = document.createElement('p'); p.className = 'line hint'; p.textContent = b.s; lines.insertBefore(p, cur); scrollDown(); return; }
+    const p = document.createElement('p'); p.className = 'line ' + b.t; lines.insertBefore(p, cur);
+    await typeInto(p, b.s, SPEED[b.t] || 16);
+    sound.zip(); carriageReturn();
+    if (b.t === 'h' || b.t === 'p') { sound.bell(); if (!skip) await wait(b.t === 'h' ? 300 : 220); }
+    else if (!skip) await wait(140);
+  }
+  function choiceRow(items) {
+    const row = document.createElement('div'); row.className = 'choices';
+    items.forEach(it => {
+      const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'choice';
+      if (it.key) { const b = document.createElement('b'); b.textContent = `[${it.key}]`; btn.appendChild(b); }
+      btn.append(it.label);
+      btn.addEventListener('click', () => {
+        if (busy) return;
+        buffer = it.key ? it.key : it.label; typein.value = buffer; renderBuffer(); submit();
+      });
+      row.appendChild(btn);
+    });
+    return row;
+  }
+  async function respond(blocks) {
+    busy = true; skip = false; cur.classList.add('hide'); setStatus('typing', true);
+    await wait(REDUCED ? 0 : 420);   // §8 motor delay
+    for (const b of blocks) await renderBlock(b);
+    busy = false; skip = false; cur.classList.remove('hide'); scrollDown(); setStatus('ready', false);
+  }
+
+  // ───────── Content ─────────
+  const MAIN = [
+    {key:'a', label:'view / print my resume'},
+    {key:'b', label:'what my last role was about'},
+    {key:'c', label:'my web coding experience'}
+  ];
+  const MORE = [
+    {label:'back to the three options'}, {label:'awards'}, {label:'education'}, {label:'publications'}, {label:'contact'}
+  ];
+  const C = {
+    hello: [
+      {t:'h', s:'hello.'},
+      {t:'p', s:"i'm yanice — senior product designer, five years into designing AI-native products and the systems around them. this is my typewriter. it knows my resume by heart, so ask it anything, or pick a key:"},
+      {t:'choices', items: MAIN},
+      {t:'hint', s:'type on your keyboard and press return. click the paper to fast-forward.'}
+    ],
+    menu: [
+      {t:'p', s:'of course. where to?'},
+      {t:'choices', items: MAIN}
+    ],
+    resume: [
+      {t:'h', s:'yanice yang — senior product designer'},
+      {t:'p', s:'santa clara, ca · yaniceydesign@gmail.com · yaniceyang.com · linkedin.com/in/yanice-yang'},
+      {t:'p', s:'five years designing AI-native and agentic workflows, B2B SaaS, creator tools and productivity systems. i turn ambiguous AI capabilities into interaction models, design systems, prototypes and shipped, measured outcomes.'},
+      {t:'h', s:'experience'},
+      {t:'li', s:'AtlasNova.AI — lead product designer · sep 2025 – present'},
+      {t:'li', s:'Cummins Inc. — senior product designer · jun 2023 – sep 2025'},
+      {t:'li', s:'Thunderbit AI — ux strategy intern · may – dec 2023'},
+      {t:'li', s:'McKinsey & Company — summer digital analyst · summer 2022'},
+      {t:'li', s:'Lark & TikTok, ByteDance — product designer · 2020 – 2021'},
+      {t:'li', s:'Xiaomi Financial Global — product designer · 2019 – 2020'},
+      {t:'h', s:'education'},
+      {t:'li', s:'University of Michigan — MS information, HCI · GPA 4.0'},
+      {t:'li', s:"Pratt Institute — BFA · dean's honor list, four years"},
+      {t:'h', s:'awards'},
+      {t:'li', s:"IDEA 2026 · iF Design · Red Dot · A' Design · VEGA gold · MUSE platinum"},
+      {t:'h', s:'publications'},
+      {t:'li', s:'four IEEE papers, 2024–2025, on gesture recognition and generative modeling of interfaces'},
+      {t:'p', s:'that is the short version. the full one fits on two pages —'},
+      {t:'choices', items:[{label:'print my resume'}, {label:'what my last role was about'}, {label:'my web coding experience'}, {label:'back to the three options'}]}
+    ],
+    print: [
+      {t:'p', s:'feeding a clean sheet to your printer… (save as PDF from the print dialog if you prefer a file.)'},
+      {t:'choices', items:[{label:'back to the three options'}]}
+    ],
+    last: [
+      {t:'h', s:'AtlasNova.AI — lead product designer'},
+      {t:'p', s:'sep 2025 to now. an agentic AI marketing and operations platform for 1,000+ small-business operators. i led product design from zero to one, plus a team of three designers and interns.'},
+      {t:'img', key:'atlasnova', cap:'ads manager — campaign monitoring state, web'},
+      {t:'li', s:'agentic workflows for campaign creation, creative generation and agent-led automation: prompt controls, brand grounding, review states, and interaction patterns that lowered hallucination risk and raised trust in the output'},
+      {t:'li', s:'an AI-readable design system — production-grounded tokens plus a machine-consumable handoff contract, so engineers and code-generating tools reuse the same components, content rules and states'},
+      {t:'li', s:'ads manager across Meta, TikTok and Google Ads, web and mobile: creative and targeting through launch, monitoring and performance review, with the data-viz and API-connected states that keep operators in control'},
+      {t:'li', s:'production front-end code, shipped by me: brand kit, competitive analysis and component generation flows in React, TypeScript, Tailwind and shadcn/ui'},
+      {t:'p', s:'once the revamped components landed as code, design-to-development handoff time dropped 30–40%.'},
+      {t:'choices', items:[{label:'before that: Cummins'}, {label:'my web coding experience'}, {label:'print my resume'}, {label:'back to the three options'}]}
+    ],
+    code: [
+      {t:'h', s:'web coding'},
+      {t:'p', s:'i design in code as much as in figma. it comes in three kinds:'},
+      {t:'li', s:'production — pull requests straight into the engineering repo at AtlasNova: brand kit, competitive analysis, component generation flow. React, TypeScript, Tailwind, shadcn/ui.'},
+      {t:'li', s:'prototypes — code-based prototypes that test AI and agent interaction models and surface API and implementation constraints before engineering starts.'},
+      {t:'li', s:'systems — an AI-readable design system: tokens and a handoff contract that both people and code-generating tools can consume.'},
+      {t:'p', s:'stack: React, TypeScript, Tailwind, shadcn/ui, Astro, JavaScript, HTML/CSS, WebGL, Supabase, Vercel, Git and PR review, REST APIs. Claude Code, Codex and Cursor are open all day.'},
+      {t:'p', s:'this page is an example — a bauhaus typewriter built in CSS 3D, key sounds synthesized in the browser with the Web Audio API, no framework, one file.'},
+      {t:'choices', items:[{label:'what my last role was about'}, {label:'print my resume'}, {label:'back to the three options'}]}
+    ],
+    cummins: [
+      {t:'h', s:'Cummins Inc. — senior product designer · new york'},
+      {t:'p', s:'jun 2023 – sep 2025. Guidanz: web and mobile SaaS that helps technicians diagnose and repair heavy-duty engines.'},
+      {t:'li', s:'end-to-end design through research, workflow redesign, prototyping and usability testing — task efficiency up 31.2%'},
+      {t:'li', s:'a design system built from the ground up, cutting design-to-development handoff time in half'},
+      {t:'li', s:'online diagnostic sessions reframed around a new information architecture and a side panel, so field issues resolve faster'},
+      {t:'li', s:'on-site research with certified Cummins technicians; their findings shaped every iteration'},
+      {t:'choices', items:[{label:'and before that?'}, {label:'what my last role was about'}, {label:'back to the three options'}]}
+    ],
+    earlier: [
+      {t:'h', s:'earlier'},
+      {t:'li', s:'Thunderbit AI, 2023 — ux strategy for an AI productivity MVP that grew from zero to 5K daily active users; early prompt-design experiments in user–agent co-creation'},
+      {t:'li', s:'McKinsey & Company, 2022 — a zero-to-one live-streamed shopping experience shipped in eight weeks; 50+ components and 10+ patterns into the McKinsey Digital design system'},
+      {t:'li', s:'Lark & TikTok, ByteDance, 2020–21 — onboarding, search and collaboration flows that lifted productivity 50%; a content-moderation strategy study across 30+ experts and 10,000+ users'},
+      {t:'li', s:'Xiaomi Financial Global, 2019–20 — Mi Finance account opening and dashboard rebuilt, conversion up 25%; the Airstar Bank Global design system'},
+      {t:'choices', items:[{label:'awards'}, {label:'print my resume'}, {label:'back to the three options'}]}
+    ],
+    opus: [
+      {t:'h', s:'Opus Clip, 2025'},
+      {t:'p', s:'a new prompt-based AI video generation feature for the #1 AI video editor in the US. from creator research and usability testing to interaction design and launch-ready specs — 10+ interviews, 500+ survey responses, A/B concept tests with 10+ users. users search footage, generate storyboards, edit voiceover, and keep control of what the AI made.'},
+      {t:'choices', items:[{label:'awards'}, {label:'back to the three options'}]}
+    ],
+    edu: [
+      {t:'h', s:'education'},
+      {t:'li', s:'University of Michigan, ann arbor — MS information, human-computer interaction · 2021–2023 · GPA 4.0'},
+      {t:'li', s:"Pratt Institute, new york — BFA · 2015–2019 · dean's honor list, four years"},
+      {t:'choices', items: MORE}
+    ],
+    awards: [
+      {t:'h', s:'awards'},
+      {t:'li', s:'IDEA Design Award — 2026 winner, design for accessibility'},
+      {t:'li', s:'iF Design Award — winner, design for accessibility'},
+      {t:'li', s:'Red Dot Design Award — winner, design for accessibility'},
+      {t:'li', s:"A' Design Award — winner, AI product interface and interaction design"},
+      {t:'li', s:'VEGA Design Award — gold, the future of at-home AI concert'},
+      {t:'li', s:'MUSE Design Award — platinum, OpusClip AI creative workflow'},
+      {t:'choices', items: MORE}
+    ],
+    papers: [
+      {t:'h', s:'publications · IEEE'},
+      {t:'li', s:'DeepSORT-driven visual tracking approach for gesture recognition in interactive systems — 2025'},
+      {t:'li', s:'generative modeling of human-computer interfaces with diffusion processes and conditional control — 2025'},
+      {t:'li', s:'toward natural and intuitive human-computer interface — 2024'},
+      {t:'li', s:'optimizing gesture recognition for seamless UI interaction — 2024'},
+      {t:'choices', items: MORE}
+    ],
+    skills: [
+      {t:'h', s:'skills'},
+      {t:'li', s:'design — AI-native workflow, AI-assisted prototyping, product strategy, interaction design, design systems, research, usability testing, IA, accessibility, responsive layouts, A/B testing, design QA'},
+      {t:'li', s:'AI product — GenAI and agentic workflows, agent interaction patterns, prompt design and controls, human-in-the-loop review, output trust, brand grounding, AI-readable design systems'},
+      {t:'li', s:'technical — React, TypeScript, Tailwind, shadcn/ui, Astro, JavaScript, HTML/CSS, WebGL, Supabase, Vercel, Git, REST APIs'},
+      {t:'li', s:'tools — Figma, Claude Code, Codex, Cursor, ChatGPT, Perplexity, Canva, AI image and video generation'},
+      {t:'choices', items: MORE}
+    ],
+    contact: [
+      {t:'h', s:'contact'},
+      {t:'p', s:'yaniceydesign@gmail.com · linkedin.com/in/yanice-yang · yaniceyang.com. santa clara, california. i reply to real messages within a day.'},
+      {t:'choices', items:[{label:'print my resume'}, {label:'back to the three options'}]}
+    ],
+    thanks: [
+      {t:'p', s:"you're welcome. the paper stays here if you want to keep reading."},
+      {t:'choices', items: MAIN}
+    ],
+    fallback: [
+      {t:'p', s:"hm — i haven't been taught that one yet. try one of these, or write to yaniceydesign@gmail.com:"},
+      {t:'choices', items: MAIN}
+    ]
+  };
+
+  function route(raw) {
+    const t = raw.toLowerCase().trim();
+    const has = re => re.test(t);
+    if (has(/^a$|resume|résumé|\bcv\b/)) return C.resume;
+    if (has(/^print/)) { setTimeout(() => window.print(), 1400); return C.print; }
+    if (has(/^b$|last role|last job|latest|current|recent|atlasnova|atlas nova/)) return C.last;
+    if (has(/^c$|cod|web|react|front|typescript|develop|engineer|program/)) return C.code;
+    if (has(/back to|option|menu|start|help/)) return C.menu;
+    if (has(/cummins|guidanz|engine/)) return C.cummins;
+    if (has(/before that|earlier|mckinsey|bytedance|tiktok|lark|xiaomi|thunderbit|history|previous/)) return C.earlier;
+    if (has(/opus/)) return C.opus;
+    if (has(/educat|school|universit|michigan|pratt|degree|study/)) return C.edu;
+    if (has(/award|prize|red dot|idea|muse|vega/)) return C.awards;
+    if (has(/paper|publication|ieee|research/)) return C.papers;
+    if (has(/skill|tool|stack|figma/)) return C.skills;
+    if (has(/contact|email|mail|hire|reach|linkedin|phone/)) return C.contact;
+    if (has(/thank|cool|nice|great|bye/)) return C.thanks;
+    if (has(/^(hi|hello|hey|yo|hola)\b/)) return C.hello;
+    return C.fallback;
+  }
+
+  // ───────── Boot ─────────
+  window.addEventListener('load', async () => {
+    fit(); focusInput();
+    await wait(REDUCED ? 0 : 1300); // let the paper rise first
+    respond(C.hello);
+  });
+})();
+</script>
